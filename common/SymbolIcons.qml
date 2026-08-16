@@ -20,7 +20,11 @@ import Quickshell
 // installed at all.
 //
 // Deliberately NOT mapped, because the drawn version is better:
-//   * the shell's own marks — apple, controlcenter, rectangle.3.group, stage;
+//   * the shell's own marks — apple, controlcenter, rectangle.3.group, stage.
+//     controlcenter especially: the only two-switch mark WhiteSur has is
+//     utilities-tweak-tool-symbolic, and it is a *filled* design, so the alpha
+//     mask Glyph tints through collapses it into a solid blob at menu-bar
+//     size. The drawn outline survives 15px; that icon does not;
 //   * geometry too simple to be worth a file — chevron.*, circle, circle.fill,
 //     ellipsis, plus, minus, xmark;
 //   * names where WhiteSur's nearest icon means something else. globe and

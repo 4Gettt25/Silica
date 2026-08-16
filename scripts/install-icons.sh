@@ -14,6 +14,10 @@
 # starts. It calls this script first, so a fresh machine installs the theme on
 # its own the first time the session comes up.
 #
+# The theme is installed from a local checkout when there is one — see
+# WHITESUR_SRC below — so the icons the session shows are the ones in the tree
+# you actually edit, and a reinstall is a file copy rather than a clone.
+#
 # Everything here is idempotent and safe to run at every login: with the theme
 # already in place it does no network access and finishes in milliseconds.
 #
@@ -21,12 +25,17 @@
 #   ./scripts/install-icons.sh              # install if missing, then configure GTK
 #   ./scripts/install-icons.sh --check      # exit 0 if installed, 1 if not; prints nothing
 #   ./scripts/install-icons.sh --force      # reinstall even if present
-#   ./scripts/install-icons.sh --theme Papirus   # configure an already installed theme
+#   ./scripts/install-icons.sh --theme WhiteSur  # only point GTK/GNOME at a theme
+#   ./scripts/install-icons.sh --source DIR # install from this checkout
 #   ./scripts/install-icons.sh --uninstall
 #
 set -euo pipefail
 
 readonly WHITESUR_REPO="https://github.com/vinceliuice/WhiteSur-icon-theme"
+# A working copy of the theme, preferred over cloning. Keeping the session on
+# the same tree the icons are edited in is the whole point: `--force` then
+# republishes local changes instead of fetching over them.
+WHITESUR_SRC="${WHITESUR_SRC:-$HOME/.github/WhiteSur-icon-theme}"
 readonly ICON_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons"
 # What install.sh lays down with no arguments.
 readonly WHITESUR_THEMES=(WhiteSur WhiteSur-light WhiteSur-dark)
@@ -46,16 +55,21 @@ die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 usage() {
     cat <<EOF
-Usage: ${0##*/} [--check|--force|--uninstall] [--theme <name>] [--no-gtk] [--quiet]
+Usage: ${0##*/} [--check|--force|--configure|--uninstall]
+       [--theme <name>] [--source <dir>] [--no-gtk] [--quiet]
 
   (no args)       Install WhiteSur if it is not already there, then point
-                  GTK at '$DEFAULT_THEME'. Does nothing expensive when the
-                  theme is already installed.
+                  GTK/GNOME at '$DEFAULT_THEME'. Does nothing expensive when
+                  the theme is already installed.
   --check         Exit 0 if the theme is installed and complete, 1 otherwise.
                   Prints nothing; meant for scripts.
-  --force         Re-clone and reinstall even if the theme is present.
-  --theme <name>  Do not install anything; just point GTK at <name>.
-  --no-gtk        Skip writing the GTK settings.ini files.
+  --force         Reinstall even if the theme is present.
+  --configure     Install nothing; only point GTK/GNOME at the theme.
+  --theme <name>  Which theme name to point GTK/GNOME at (default
+                  '$DEFAULT_THEME').
+  --source <dir>  Install from this checkout instead of
+                  '$WHITESUR_SRC'. Falls back to cloning when neither exists.
+  --no-gtk        Skip writing the GTK settings.
   --quiet         Only warnings and errors.
   --uninstall     Remove the WhiteSur directories this script installed and
                   the gtk-icon-theme-name settings it wrote.
@@ -106,37 +120,66 @@ clear_settings_ini() {
 
 configure_gtk() {
     [[ "$write_gtk" -eq 1 ]] || return 0
+
+    # Pointing anything at a theme that is not on disk is worse than leaving it
+    # alone: GTK does not fall back to a nice theme, it falls back to hicolor,
+    # and you get a desktop of generic paper-sheet icons. (This is exactly what
+    # a stale `icon-theme 'Papirus'` did here with no Papirus installed.)
+    if ! theme_dir "$theme" >/dev/null; then
+        warn "icon theme '$theme' is not installed — leaving the GTK settings alone"
+        return 0
+    fi
+
     write_settings_ini "$HOME/.config/gtk-3.0"
     write_settings_ini "$HOME/.config/gtk-4.0"
-    # gsettings is what a running GTK session actually reads; harmless when
-    # dconf is not available (a bare niri session may have no dbus session bus
-    # for it yet).
+
+    # settings.ini is only read by GTK apps that have no settings portal. When
+    # xdg-desktop-portal-gtk/-gnome is running — and it is, in this session —
+    # GTK asks the portal, and the portal answers from gsettings. So this line,
+    # not the files above, is what Nautilus actually obeys, and it applies to
+    # already-running apps without a restart.
     if command -v gsettings >/dev/null 2>&1; then
-        gsettings set org.gnome.desktop.interface icon-theme "$theme" 2>/dev/null || true
+        if gsettings set org.gnome.desktop.interface icon-theme "$theme" 2>/dev/null; then
+            log "set org.gnome.desktop.interface icon-theme=$theme"
+        else
+            warn "could not set the GNOME icon-theme (no dconf/dbus session?)"
+        fi
     fi
 }
 
 install_whitesur() {
-    command -v git >/dev/null 2>&1 || die "git is required to fetch WhiteSur"
-    local tmp
-    tmp="$(mktemp -d)"
-    trap 'rm -rf "$tmp"' EXIT
-    log "cloning WhiteSur-icon-theme (shallow) ..."
-    if [[ "$quiet" -eq 1 ]]; then
-        git clone --depth=1 "$WHITESUR_REPO" "$tmp/WhiteSur-icon-theme" >/dev/null 2>&1
+    local src="" tmp=""
+
+    if [[ -x "$WHITESUR_SRC/install.sh" ]]; then
+        src="$WHITESUR_SRC"
+        log "installing from the local checkout $src ..."
     else
-        git clone --depth=1 "$WHITESUR_REPO" "$tmp/WhiteSur-icon-theme"
+        command -v git >/dev/null 2>&1 || die "git is required to fetch WhiteSur"
+        tmp="$(mktemp -d)"
+        trap 'rm -rf "$tmp"' EXIT
+        log "no checkout at $WHITESUR_SRC — cloning WhiteSur-icon-theme (shallow) ..."
+        if [[ "$quiet" -eq 1 ]]; then
+            git clone --depth=1 "$WHITESUR_REPO" "$tmp/WhiteSur-icon-theme" >/dev/null 2>&1
+        else
+            git clone --depth=1 "$WHITESUR_REPO" "$tmp/WhiteSur-icon-theme"
+        fi
+        src="$tmp/WhiteSur-icon-theme"
     fi
+
     log "installing into $ICON_DIR ..."
     # install.sh with no arguments installs WhiteSur / -light / -dark for the
-    # current user.
+    # current user. It resolves its own sources relative to $0, so it has to be
+    # run from its own directory.
     if [[ "$quiet" -eq 1 ]]; then
-        "$tmp/WhiteSur-icon-theme/install.sh" >/dev/null
+        (cd "$src" && ./install.sh >/dev/null)
     else
-        "$tmp/WhiteSur-icon-theme/install.sh"
+        (cd "$src" && ./install.sh)
     fi
-    rm -rf "$tmp"
-    trap - EXIT
+
+    if [[ -n "$tmp" ]]; then
+        rm -rf "$tmp"
+        trap - EXIT
+    fi
 
     # Qt reads the theme through the on-disk cache when there is one; a stale
     # cache from an older install would hide the new icons.
@@ -174,10 +217,15 @@ while [[ $# -gt 0 ]]; do
         --uninstall) mode="uninstall"; shift ;;
         --no-gtk)    write_gtk=0; shift ;;
         --quiet)     quiet=1; shift ;;
+        --configure) mode="configure"; shift ;;
         --theme)
             [[ $# -ge 2 && "$2" != -* ]] || die "--theme requires a theme name"
             theme="$2"
-            mode="configure"
+            shift 2
+            ;;
+        --source)
+            [[ $# -ge 2 && "$2" != -* ]] || die "--source requires a directory"
+            WHITESUR_SRC="$2"
             shift 2
             ;;
         -h|--help)   usage; exit 0 ;;
@@ -195,7 +243,6 @@ case "$mode" in
         exit 0
         ;;
     configure)
-        theme_dir "$theme" >/dev/null || warn "icon theme '$theme' is not installed — configuring anyway"
         configure_gtk
         exit 0
         ;;

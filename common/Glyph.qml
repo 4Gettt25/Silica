@@ -620,13 +620,25 @@ Item {
                 break;
             }
             case "controlcenter": {
-                // Two stacked switches, as in the macOS menu bar.
+                // Two stacked switches, as in the macOS menu bar: the upper
+                // one on (knob right), the lower one off (knob left).
+                //
+                // What decides whether this reads at 15px is the gap between
+                // the two pills, and the stroke eats into it from both sides:
+                // the drawn gap is the distance between the paths minus one
+                // whole line width. Keep that difference near 2.3 grid units
+                // (~1.4px at menu-bar size) or the pair fuses into one blob.
+                // The lighter stroke below buys most of it back, and the pair
+                // is centred on the grid so the mark sits on the bar's optical
+                // centre rather than riding high.
+                const w = 17.0, h = 5.4, r = h / 2, gap = 3.8;
+                const x0 = (24 - w) / 2, y0 = (24 - (2 * h + gap)) / 2;
+                ctx.lineWidth = g.weight * 0.85;
                 for (let i = 0; i < 2; i++) {
-                    const y = 6.4 + i * 7.6;
-                    rrect(3.6, y - 2.6, 16.8, 5.2, 2.6);
-                    ctx.lineWidth = g.weight * 0.95;
+                    const y = y0 + r + i * (h + gap);
+                    rrect(x0, y - r, w, h, r);
                     ctx.stroke();
-                    dot(i === 0 ? 16.2 : 7.8, y, 1.35);
+                    dot(i === 0 ? x0 + w - r : x0 + r, y, 1.35);
                 }
                 break;
             }

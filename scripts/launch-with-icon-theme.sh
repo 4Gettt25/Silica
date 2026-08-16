@@ -47,6 +47,14 @@ fi
 # would lose the icons the system theme could still have provided.
 if "$SCRIPT_DIR/install-icons.sh" --check; then
     export QS_ICON_THEME="$theme"
+
+    # And point the rest of the session at the same theme, every login — not
+    # only on the login that installed it. The shell is not the only thing on
+    # screen: Nautilus and every other GTK app read the GNOME icon-theme key,
+    # and if that key names a theme this machine does not have (it said
+    # 'Papirus' here, with no Papirus installed) they fall all the way back to
+    # hicolor and show generic icons next to the shell's WhiteSur ones.
+    "$SCRIPT_DIR/install-icons.sh" --configure --theme "$theme" --quiet || true
 fi
 
 exec qs -c macos-shell

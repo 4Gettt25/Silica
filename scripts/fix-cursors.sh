@@ -3,12 +3,31 @@
 # fix-cursors.sh — diagnose the "two overlapping mouse cursors" issue and
 # print the exact compositor config lines that fix it.
 #
-# Why two cursors: the compositor draws its SOFTWARE cursor on top of a
-# HARDWARE (KMS/DRM) cursor plane. Common in VMs (virtio-gpu/vmware) and when
-# the configured hyprcursor/XCursor theme is missing so the fallback is drawn
-# twice. macos-shell cannot fix this — it is compositor-side — so this script
-# only DETECTS and PRINTS. With --apply it appends the Hyprland lines to
-# hyprland.conf, and only after an interactive confirmation.
+# Why two cursors, USUALLY: the compositor draws its SOFTWARE cursor on top of
+# a HARDWARE (KMS/DRM) cursor plane, or the configured cursor theme is missing
+# so a fallback is drawn twice. macos-shell cannot fix either — both are
+# compositor-side — so this script only DETECTS and PRINTS. With --apply it
+# appends the Hyprland lines to hyprland.conf, after an interactive
+# confirmation.
+#
+# BEFORE trusting any of that, run the one test that tells you whether the
+# second pointer is inside the session at all:
+#
+#     niri msg action screenshot-screen --path /tmp/cursor-probe.png
+#
+# --show-pointer defaults to true, so the capture contains the compositor's
+# own pointer. Count the cursors in the PNG while the screen is showing two:
+#
+#   two in the PNG  -> genuinely a compositor problem; read on.
+#   one in the PNG  -> the other pointer is NOT in the guest's framebuffer, so
+#                      no compositor or shell setting can touch it. In a VM
+#                      that is the hypervisor drawing the host's own pointer
+#                      over the VM window — the giveaway is that it stays a
+#                      plain arrow while the real cursor becomes an I-beam.
+#                      Fix it on the host (VMware: grab the pointer with
+#                      Ctrl+G, or set vmmouse.present = "FALSE" in the .vmx).
+#                      open-vm-tools has no Wayland pointer integration, so a
+#                      Wayland guest does not get the handoff that hides it.
 #
 # Usage:
 #   ./scripts/fix-cursors.sh            # detect + print recommended config
@@ -95,10 +114,19 @@ Add this block to ~/.config/niri/config.kdl, then restart niri:
         xcursor-size 24
     }
 
-Note: niri has no no_hardware_cursors toggle; on virtio-gpu/VMs the duplicate
-cursor comes from the kernel driver and disappears once a proper xcursor
-theme is set (niri then hides the hardware plane). If it persists, run niri
-with the WLR_NO_HARDWARE_CURSORS=1 environment variable set.
+niri's equivalent of no_hardware_cursors is a debug option:
+
+    debug {
+        disable-cursor-plane
+    }
+
+Do not reach for it first. niri is not wlroots-based, so WLR_NO_HARDWARE_CURSORS
+does nothing here, and a missing xcursor theme does not duplicate the pointer —
+it changes what the one pointer looks like. Take the screenshot probe described
+at the top of this script before changing anything: if the second pointer is not
+in the capture, disable-cursor-plane will not remove it either, and it costs you
+the hardware cursor (pointer motion moves onto the render path, so the remaining
+cursor gets LAGGIER, not better).
 EOF
         ;;
     *)
