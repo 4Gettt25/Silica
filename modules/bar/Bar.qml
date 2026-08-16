@@ -286,12 +286,14 @@ Scope {
                             {
                                 text: "Undo",
                                 shortcut: "⌘Z",
-                                enabled: false
+                                enabled: BarActions.wtypeAvailable,
+                                action: () => BarActions.editUndo()
                             },
                             {
                                 text: "Redo",
                                 shortcut: "⇧⌘Z",
-                                enabled: false
+                                enabled: BarActions.wtypeAvailable,
+                                action: () => BarActions.editRedo()
                             },
                             {
                                 separator: true
@@ -299,22 +301,26 @@ Scope {
                             {
                                 text: "Cut",
                                 shortcut: "⌘X",
-                                enabled: false
+                                enabled: BarActions.wtypeAvailable,
+                                action: () => BarActions.editCut()
                             },
                             {
                                 text: "Copy",
                                 shortcut: "⌘C",
-                                enabled: false
+                                enabled: BarActions.wtypeAvailable,
+                                action: () => BarActions.editCopy()
                             },
                             {
                                 text: "Paste",
                                 shortcut: "⌘V",
-                                enabled: false
+                                enabled: BarActions.wtypeAvailable,
+                                action: () => BarActions.editPaste()
                             },
                             {
                                 text: "Select All",
                                 shortcut: "⌘A",
-                                enabled: false
+                                enabled: BarActions.wtypeAvailable,
+                                action: () => BarActions.editSelectAll()
                             },
                             {
                                 separator: true

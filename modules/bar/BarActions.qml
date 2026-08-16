@@ -2,6 +2,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "../../common"
 
 // Small module-local helpers shared by the bar, its menus and its extras.
@@ -107,5 +108,73 @@ Singleton {
 
     function clearRecents() {
         recentApps = [];
+    }
+
+    // ---------------------------------------------------------- Edit actions
+    // The menu bar's Edit menu has to act on whatever window is focused, but
+    // this shell has no in-process access to a Linux app's edit commands —
+    // unlike a real macOS app, which implements the Edit menu itself. The
+    // only thing that reaches across processes is a synthesized key combo, so
+    // Cut/Copy/Paste etc. shell out to wtype (the wlr virtual-keyboard
+    // protocol; it always types into whatever surface the compositor
+    // currently considers focused, so there is no window to target).
+    readonly property bool wtypeAvailable: _wtypeCheck.available
+
+    QtObject {
+        id: _wtypeCheck
+        property bool available: false
+    }
+
+    Process {
+        command: ["sh", "-c", "command -v wtype >/dev/null 2>&1 && echo yes || echo no"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: _wtypeCheck.available = text.trim() === "yes"
+        }
+    }
+
+    // Clicking an Edit item closes the menu first (ShellState.openMenu = ""),
+    // which destroys the menu's focus-grabbing popup and asks the compositor
+    // to hand keyboard focus back to the window that was focused before the
+    // menu opened — an async round trip (see Compositor._publishAppName's
+    // identical race). Firing wtype in the same tick would often still land
+    // on the popup instead of the app, so it waits one beat first.
+    Timer {
+        id: editActionDelay
+        interval: 220
+        property var pendingArgs: []
+        onTriggered: Quickshell.execDetached(pendingArgs)
+    }
+
+    function _sendKeyCombo(mods, key) {
+        if (!root.wtypeAvailable)
+            return;
+        const args = ["wtype"];
+        for (const m of mods)
+            args.push("-M", m);
+        args.push("-k", key);
+        for (let i = mods.length - 1; i >= 0; i--)
+            args.push("-m", mods[i]);
+        editActionDelay.pendingArgs = args;
+        editActionDelay.restart();
+    }
+
+    function editUndo() {
+        _sendKeyCombo(["ctrl"], "z");
+    }
+    function editRedo() {
+        _sendKeyCombo(["ctrl", "shift"], "z");
+    }
+    function editCut() {
+        _sendKeyCombo(["ctrl"], "x");
+    }
+    function editCopy() {
+        _sendKeyCombo(["ctrl"], "c");
+    }
+    function editPaste() {
+        _sendKeyCombo(["ctrl"], "v");
+    }
+    function editSelectAll() {
+        _sendKeyCombo(["ctrl"], "a");
     }
 }

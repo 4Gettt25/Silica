@@ -33,6 +33,12 @@ Scope {
         inlineReplySupported: false
 
         onNotification: notification => {
+            // niri fires its own transient "Screenshot captured" notification for
+            // every screenshot-screen action — including the one ShellState's lock
+            // flow takes internally to build the blurred lock background. Drop it
+            // rather than surface a notification about our own implementation detail.
+            if (notification.appName === "niri" && notification.summary === "Screenshot captured")
+                return;
             // Without this the object is discarded when the handler returns.
             notification.tracked = true;
             const entry = NotificationStore.add(notification);

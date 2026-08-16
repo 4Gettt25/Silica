@@ -141,21 +141,6 @@ Scope {
             root.btAdapter.enabled = !root.btAdapter.enabled;
     }
 
-    // -------------------------------------------------------------- AirDrop
-    // Decorative: Linux has no AirDrop, but macOS always shows the tile.
-    property string airdropMode: "off" // off | contacts | everyone
-    readonly property bool airdropOn: root.airdropMode !== "off"
-    readonly property string airdropStatus: {
-        switch (root.airdropMode) {
-        case "contacts":
-            return "Contacts Only";
-        case "everyone":
-            return "Everyone";
-        default:
-            return "Off";
-        }
-    }
-
     // ---------------------------------------------------------------- Focus
     readonly property bool focusOn: ShellState.doNotDisturb
     property string focusMode: "dnd" // which mode the Focus detail has selected
@@ -172,8 +157,6 @@ Scope {
         }
     }
 
-    // ------------------------------------------------------- Stage Manager
-    property bool stageManagerOn: false
     property bool nightShiftOn: false
 
     // ----------------------------------------------------------- brightness
@@ -401,52 +384,20 @@ Scope {
                                 onToggled: root.toggleBluetooth()
                                 onDetailRequested: root.page = "bluetooth"
                             }
+                        }
+
+                        // ---- Focus ----
+                        CcGroup {
+                            Layout.fillWidth: true
 
                             CcTile {
                                 Layout.fillWidth: true
-                                glyph: "airdrop"
-                                title: "AirDrop"
-                                subtitle: root.airdropStatus
-                                active: root.airdropOn
+                                glyph: "moon"
+                                title: root.focusOn ? root.focusStatus : "Focus"
+                                active: root.focusOn
                                 hasDetail: true
-                                onToggled: root.airdropMode = root.airdropOn ? "off" : "contacts"
-                                onDetailRequested: root.page = "airdrop"
-                            }
-                        }
-
-                        // ---- Focus | Stage Manager ----
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Theme.space2
-
-                            CcGroup {
-                                Layout.fillWidth: true
-                                Layout.preferredWidth: 1
-                                Layout.fillHeight: true
-
-                                CcTile {
-                                    Layout.fillWidth: true
-                                    glyph: "moon"
-                                    title: root.focusOn ? root.focusStatus : "Focus"
-                                    active: root.focusOn
-                                    hasDetail: true
-                                    onToggled: ShellState.doNotDisturb = !ShellState.doNotDisturb
-                                    onDetailRequested: root.page = "focus"
-                                }
-                            }
-
-                            CcGroup {
-                                Layout.fillWidth: true
-                                Layout.preferredWidth: 1
-                                Layout.fillHeight: true
-
-                                CcTile {
-                                    Layout.fillWidth: true
-                                    glyph: "stage"
-                                    title: "Stage Manager"
-                                    active: root.stageManagerOn
-                                    onToggled: root.stageManagerOn = !root.stageManagerOn
-                                }
+                                onToggled: ShellState.doNotDisturb = !ShellState.doNotDisturb
+                                onDetailRequested: root.page = "focus"
                             }
                         }
 
@@ -548,8 +499,6 @@ Scope {
                                 return wifiDetail;
                             case "bluetooth":
                                 return btDetail;
-                            case "airdrop":
-                                return airdropDetail;
                             case "focus":
                                 return focusDetail;
                             case "display":
@@ -674,50 +623,6 @@ Scope {
                             color: Theme.secondaryLabel
                             text: "No Bluetooth adapter was found."
                             wrapMode: Text.WordWrap
-                        }
-                    }
-                }
-
-                Component {
-                    id: airdropDetail
-
-                    CcDetail {
-                        title: "AirDrop"
-                        onBack: root.page = ""
-
-                        CcSectionLabel {
-                            Layout.fillWidth: true
-                            text: "Allow me to be discovered by"
-                        }
-
-                        CcGroup {
-                            Layout.fillWidth: true
-                            padding: Theme.space1
-
-                            Repeater {
-                                model: [
-                                    {
-                                        id: "off",
-                                        name: "No One"
-                                    },
-                                    {
-                                        id: "contacts",
-                                        name: "Contacts Only"
-                                    },
-                                    {
-                                        id: "everyone",
-                                        name: "Everyone"
-                                    }
-                                ]
-
-                                CcRow {
-                                    required property var modelData
-                                    Layout.fillWidth: true
-                                    label: modelData.name
-                                    checked: root.airdropMode === modelData.id
-                                    onClicked: root.airdropMode = modelData.id
-                                }
-                            }
                         }
                     }
                 }

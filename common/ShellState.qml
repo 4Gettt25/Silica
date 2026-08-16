@@ -178,6 +178,68 @@ Singleton {
 
     signal lockRequested()
 
+    // ---------------------------------------------------------------- lock
+    // Actually authenticating a password is security-critical and belongs to
+    // a dedicated, audited locker rather than something reimplemented here —
+    // swaylock is spawned and skinned with the shell's accent color rather
+    // than the shell trying to become the session lock itself.
+    readonly property bool lockAvailable: _lockCheck.available
+
+    QtObject {
+        id: _lockCheck
+        property bool available: false
+    }
+
+    Process {
+        command: ["sh", "-c", "command -v swaylock >/dev/null 2>&1 && echo yes || echo no"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: _lockCheck.available = text.trim() === "yes"
+        }
+    }
+
+    function _hex(c) {
+        const ch = v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0");
+        return ch(c.r) + ch(c.g) + ch(c.b);
+    }
+
+    onLockRequested: {
+        if (!lockAvailable) {
+            console.warn("macos-shell: Lock Screen requested but swaylock is not installed");
+            return;
+        }
+        const accent = _hex(Theme.accent);
+        // ring-color is the dim idle/typing ring; key-hl-color is the per-keystroke
+        // highlight segment. They used to both be the plain accent, which made typing
+        // invisible — the highlight was the same color as the ring underneath it.
+        const lockArgs = "--clock --indicator --indicator-radius 110 --indicator-thickness 10" +
+            " --ring-color " + accent + "40 --key-hl-color " + accent + "ff" +
+            " --inside-color 000000cc --line-color 00000000 --separator-color 00000000 --text-color ffffffff";
+        // swaylock-effects' own --screenshots/--effect-blur crash under niri (its wlr-screencopy
+        // grab is flaky there), and when the locker dies mid-lock niri is left showing a solid
+        // fallback color with no lock surface to interact with — an unrecoverable lockout that
+        // needs a TTY switch to fix (https://github.com/niri-wm/niri/issues/2986). So grab and
+        // blur the screenshot ourselves with niri's own (reliable) screenshot command + ImageMagick
+        // *before* swaylock ever starts, and hand it a static --image. Falls back to a flat color
+        // if that pipeline fails for any reason — never falls back to the crashy internal path.
+        const script = `
+            dir="\${XDG_RUNTIME_DIR:-/tmp}"
+            shot="$dir/quickshell-lock-shot.png"
+            blur="$dir/quickshell-lock-blur.png"
+            rm -f "$shot" "$blur"
+            niri msg action screenshot-screen --show-pointer false --path "$shot" >/dev/null 2>&1
+            for i in $(seq 1 40); do [ -s "$shot" ] && break; sleep 0.05; done
+            magick "$shot" -scale 15% -blur 0x6 -resize 700% "$blur" >/dev/null 2>&1
+            if [ -s "$blur" ]; then
+                swaylock -i "$blur" --scaling fill ${lockArgs}
+            else
+                swaylock --color 000000ff ${lockArgs}
+            fi
+            rm -f "$shot" "$blur"
+        `;
+        Quickshell.execDetached(["sh", "-c", script]);
+    }
+
     // Bindable from the compositor: `qs -c macos-shell ipc call shell <fn>`.
     IpcHandler {
         target: "shell"

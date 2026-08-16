@@ -100,6 +100,19 @@ ColumnLayout {
         return "";
     }
 
+    // Both compositors let their config `include`/`source` other files in the
+    // same directory (niri's config.kdl commonly splits out a binds.kdl), so
+    // the bound-key scan has to cover the whole directory, not just the entry
+    // file, or every action here would wrongly show "Not bound".
+    readonly property string configDir: {
+        const home = Quickshell.env("HOME") ?? "";
+        if (niri)
+            return home + "/.config/niri";
+        if (hyprland)
+            return home + "/.config/hypr";
+        return "";
+    }
+
     // ---- what is bound right now, read straight from the compositor config ----
     // { "launcher.toggle": "Mod+Space", ... }
     property var boundKeys: ({})
@@ -119,11 +132,13 @@ ColumnLayout {
 
     Process {
         id: scan
-        running: root.configPath !== ""
+        running: root.configDir !== ""
         // Every line of the config that spawns a `qs ipc call`, with the key
         // combo it is bound to. Quoting differs between the two config
         // formats, so the strings are simply stripped of quotes and commas.
-        command: ["sh", "-c", "grep -hE 'ipc' " + JSON.stringify(root.configPath) + " 2>/dev/null | grep -E 'qs|quickshell' || true"]
+        // Recurses through the whole config directory (-r) since the binds
+        // are frequently kept in a file the entry config only `include`s.
+        command: ["sh", "-c", "grep -rhE 'ipc' " + JSON.stringify(root.configDir) + " 2>/dev/null | grep -E 'qs|quickshell' || true"]
 
         stdout: StdioCollector {
             onStreamFinished: {
