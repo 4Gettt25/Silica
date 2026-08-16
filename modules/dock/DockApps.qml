@@ -160,10 +160,10 @@ QtObject {
             ShellState.openSettings("");
             return "";
         case "trash":
-            Quickshell.execDetached(["xdg-open", "trash:///"]);
+            Opener.location("trash:///");
             return "";
         case "downloads":
-            Quickshell.execDetached(["xdg-open", downloadsDir]);
+            Opener.location(downloadsDir);
             return "";
         }
 

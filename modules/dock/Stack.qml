@@ -56,8 +56,10 @@ Item {
         return ["png", "jpg", "jpeg", "gif", "webp", "bmp"].indexOf(ext) >= 0;
     }
 
+    // `ls -t` lists directories as well as files, so a row can be either —
+    // Opener.path sorts that out at click time.
     function open(name) {
-        Quickshell.execDetached(["xdg-open", root.directory + "/" + name]);
+        Opener.path(root.directory + "/" + name);
     }
 
     Shadow {
