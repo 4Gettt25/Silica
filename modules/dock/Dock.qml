@@ -59,6 +59,22 @@ Scope {
     // The falloff reaches zero about two and a half icons out.
     readonly property real magRadius: (base + gap) * 2.5
 
+    // Headroom the window keeps beyond the pill, for everything that floats
+    // above a magnified icon. There is no separate popup surface: the tooltip
+    // and the Downloads stack are children of this window, so anything taller
+    // than this is simply cut off by the surface edge.
+    //
+    // The stack is the tall one, so the headroom is sized to its worst case.
+    // These three lines mirror the geometry in Stack.qml (tileSize is what
+    // DockIcon passes it) — change them together.
+    readonly property real stackTile: Math.round(base * 0.72)
+    readonly property real stackCell: stackTile + Math.round(Theme.fsCaption * 2.2)
+    // At most 6 files in at most 3 columns, so at most 2 rows / 3 columns.
+    readonly property real stackMaxH: 2 * stackCell + Theme.space3 * 2
+    readonly property real stackMaxW: 3 * (stackTile + Theme.space3) + Theme.space3 * 2
+    // A side dock opens the stack sideways, so the long axis swaps with it.
+    readonly property real headroom: Math.round((vertical ? stackMaxW : stackMaxH) + Theme.space2 + Theme.space1)
+
     // ---------------------------------------------------------------- items
     function _sep(key) {
         return {
@@ -351,9 +367,9 @@ Scope {
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
             WlrLayershell.namespace: "macos-shell-dock"
 
-            // The window is deliberately bigger than the pill: magnified icons
-            // and the tooltip draw in the headroom.
-            readonly property real thickness: root.pillPad + root.pillThickness + 40
+            // The window is deliberately bigger than the pill: magnified icons,
+            // the tooltip and the Downloads stack all draw in the headroom.
+            readonly property real thickness: root.pillPad + root.pillThickness + root.headroom
             implicitHeight: root.vertical ? 0 : thickness
             implicitWidth: root.vertical ? thickness : 0
 

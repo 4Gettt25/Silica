@@ -280,9 +280,14 @@ Item {
         }
     }
 
+    // The stack opens on hover and the tooltip appears after a dwell, so on the
+    // Downloads icon both used to come up — at the same anchor, one behind the
+    // other. The stack already names what it is showing, so it wins.
+    readonly property bool stackOpen: !isSep && modelData.special === "downloads" && hovered
+
     Item {
         id: tip
-        visible: cell.tipShown && cell.opacity > 0
+        visible: cell.tipShown && !cell.stackOpen && cell.opacity > 0
         opacity: cell.tipShown ? 1 : 0
         width: tipLabel.implicitWidth + Theme.space3 * 2
         height: tipLabel.implicitHeight + Theme.space1 * 2
@@ -319,7 +324,7 @@ Item {
     // ------------------------------------------------------ downloads stack
     // The fan/grid preview of the newest files, loaded only while hovered.
     Loader {
-        active: !cell.isSep && cell.modelData.special === "downloads" && cell.hovered
+        active: cell.stackOpen
         visible: active
         x: cell.vertical ? (dock.edge === "left" ? cell.width + Theme.space2 : -width - Theme.space2) : (cell.width - width) / 2
         y: cell.vertical ? Math.max(-cell.y, -height / 2) : cell.visY + cell.peak * (1 - cell.visScale) - height - Theme.space2
