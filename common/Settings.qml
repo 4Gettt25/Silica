@@ -25,6 +25,10 @@ Singleton {
     // drops blur/translucency and long animations.
     property alias reduceTransparency: adapter.reduceTransparency
     property alias reduceMotion: adapter.reduceMotion
+    // Where the shell's UI symbols come from: "theme" takes them from the
+    // installed icon theme (WhiteSur, see scripts/install-icons.sh) wherever
+    // it has one, "drawn" always uses Glyph's own Canvas paths.
+    property alias symbolStyle: adapter.symbolStyle
 
     // --- menu bar ---------------------------------------------------------
     property alias clock24h: adapter.clock24h
@@ -88,6 +92,7 @@ Singleton {
             property string accent: "blue"
             property bool reduceTransparency: false
             property bool reduceMotion: false
+            property string symbolStyle: "theme"
 
             property bool clock24h: true
             property bool clockShowSeconds: false

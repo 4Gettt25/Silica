@@ -37,6 +37,9 @@ Scope {
 
             // Reserve space only when the bar is actually on screen.
             exclusionMode: Settings.menuBarAutoHide ? ExclusionMode.Ignore : ExclusionMode.Auto
+            // Named like every other surface the shell maps, so a compositor
+            // layer-rule can single the menu bar out.
+            WlrLayershell.namespace: "macos-shell-bar"
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
             // Both the input mask and the compositor blur follow the surface,

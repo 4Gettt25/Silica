@@ -113,6 +113,7 @@ Scope {
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.namespace: "macos-shell-notifications"
             // Alerts must never take focus: that would blank the menu bar's
             // app name and steal keys from the user's window.
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None

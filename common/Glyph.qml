@@ -1,11 +1,7 @@
 import QtQuick
+import QtQuick.Effects
 
-// A single monochrome symbol, drawn procedurally.
-//
-// The shell must not depend on a nerd font or an SVG icon set being present,
-// so every glyph is painted on a Canvas against a 24x24 design grid (the same
-// grid SF Symbols uses) and scaled to `size`. Stroke weight follows the grid
-// so a 12px and a 32px glyph look like the same family.
+// A single monochrome symbol.
 //
 // Usage:  Glyph { name: "wifi"; size: 15; color: Theme.label }
 //         Glyph { name: "wifi"; level: 1 }            // 0..3 signal bars
@@ -13,7 +9,22 @@ import QtQuick
 // Names deliberately echo SF Symbols so the intent is readable at the call
 // site; unknown names draw nothing (never an error box).
 //
-// Sharpness. Two things used to make these look soft at menu-bar sizes:
+// Two renderers sit behind that one API:
+//
+//   * an installed icon theme, when it has a symbolic icon for the name.
+//     common/SymbolIcons.qml owns the name mapping; scripts/install-icons.sh
+//     installs WhiteSur, whose symbolic set is drawn in the macOS idiom. The
+//     SVG is rasterised at exactly the size it is shown at and then tinted to
+//     `color`: symbolic icons carry their shape in the alpha channel, so a
+//     flat colour masked by that alpha is the icon in the shell's ink;
+//   * the Canvas below otherwise — every symbol painted procedurally on a
+//     24x24 grid (the grid SF Symbols uses), so the shell still looks right
+//     with no icon theme installed, and so the handful of marks that are
+//     better hand-drawn than themed (the Apple logo, the Control Center
+//     switches, the pop-up button chevrons) keep their exact shapes.
+//
+// Sharpness of the drawn path. Two things used to make these look soft at
+// menu-bar sizes:
 //
 //   * the canvas was rasterised at exactly one device pixel per point, so a
 //     1.2px stroke landed between two pixel rows. The Canvas is now drawn at
@@ -44,6 +55,11 @@ Item {
     // Supersampling factor. A HiDPI backing store already has the samples.
     readonly property int ss: Screen.devicePixelRatio >= 2 ? 1 : 2
 
+    // "" when the icon theme has nothing for this name/state, which is what
+    // hands the symbol back to the Canvas.
+    readonly property string themedSource: SymbolIcons.resolve(name, level, value, charging)
+    readonly property bool themed: themedSource !== ""
+
     implicitWidth: Math.max(1, Math.round(size))
     implicitHeight: Math.max(1, Math.round(size))
 
@@ -57,9 +73,75 @@ Item {
         canvas.requestPaint();
     }
 
+    // ------------------------------------------------------- themed symbol
+    // A flat rectangle of `color`, masked by the icon's alpha channel. Reading
+    // only the alpha is deliberate: it makes the shell's ink — and therefore
+    // the selected/disabled/accent states — win over whatever grey the theme
+    // painted its symbolic icons in, and it works identically in light and
+    // dark mode from one set of files.
+    Item {
+        id: themedLayer
+
+        visible: g.themed
+        x: Math.round((g.width - g.px) / 2)
+        y: Math.round((g.height - g.px) / 2)
+        width: g.px
+        height: g.px
+
+        Image {
+            id: themedMask
+
+            anchors.fill: parent
+            // Only ever the mask for the tint below; never drawn itself.
+            // `layer.enabled` is not optional here — MultiEffect can only read
+            // a mask that has been rendered to a texture, and a hidden Image
+            // on its own never is (the mask then reads as fully opaque and
+            // every symbol comes out a solid square).
+            visible: false
+            layer.enabled: true
+            source: g.themedSource
+            // Rasterise the SVG at its final pixel size instead of scaling a
+            // 16px raster up — this is the whole point of moving to a theme.
+            sourceSize.width: g.px * g.ss
+            sourceSize.height: g.px * g.ss
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
+            cache: true
+        }
+
+        Rectangle {
+            id: themedInk
+
+            anchors.fill: parent
+            visible: false
+            color: g.color
+            layer.enabled: true
+        }
+
+        MultiEffect {
+            anchors.fill: parent
+            source: themedInk
+            autoPaddingEnabled: false
+            maskEnabled: true
+            maskSource: themedMask
+            // The mask ramp runs from `threshold - spread/2` to
+            // `threshold + spread/2`, so these two values spread it across the
+            // whole 0..1 alpha range. Anything narrower posterises the icon:
+            // edges lose their anti-aliasing and the deliberately dimmed parts
+            // (the weak arcs of a low Wi-Fi signal, which is the only thing
+            // separating one signal-strength icon from the next) jump to full
+            // strength. A threshold of 0 with any spread includes alpha 0 too
+            // and fills the whole square.
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1.0
+        }
+    }
+
     Canvas {
         id: canvas
 
+        visible: !g.themed
         width: g.px * g.ss
         height: g.px * g.ss
         // Centred, because an item filled by anchors need not be square.

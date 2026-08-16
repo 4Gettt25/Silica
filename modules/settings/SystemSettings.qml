@@ -299,7 +299,6 @@ Scope {
 
                         SettingsRow {
                             label: "Accent colour"
-                            showSeparator: false
 
                             Row {
                                 spacing: 8
@@ -342,6 +341,19 @@ Scope {
                                         }
                                     }
                                 }
+                            }
+                        }
+
+                        SettingsRow {
+                            label: "Symbols"
+                            detail: SymbolIcons.available ? "Take the shell's symbols from the installed icon theme, or draw them." : "No icon theme with symbolic icons was found — run scripts/install-icons.sh."
+                            showSeparator: false
+
+                            MacSegmented {
+                                width: 180
+                                options: ["Icon theme", "Drawn"]
+                                currentIndex: Settings.symbolStyle === "drawn" ? 1 : 0
+                                onSelected: i => Settings.symbolStyle = (i === 1 ? "drawn" : "theme")
                             }
                         }
                     }
